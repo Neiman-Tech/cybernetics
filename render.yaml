@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: terminal-api-service
+    env: docker
+    plan: free
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: API_KEY
+        generateValue: true
+        sync: false

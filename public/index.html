@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terminal API Demo</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0a0a0a;
+      color: #fff;
+      padding: 20px;
+      margin: 0;
+    }
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 { color: #00ff00; margin-bottom: 20px; }
+    .config {
+      background: #1a1a1a;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    .config input {
+      width: 100%;
+      padding: 8px;
+      background: #2a2a2a;
+      border: 1px solid #444;
+      color: #fff;
+      border-radius: 4px;
+      margin: 5px 0 15px 0;
+      font-family: monospace;
+    }
+    .config button {
+      background: #00ff00;
+      color: #000;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-right: 10px;
+    }
+    .status {
+      background: #1a1a1a;
+      padding: 10px 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    .status-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #666;
+      margin-right: 8px;
+    }
+    .status-dot.connected { background: #00ff00; box-shadow: 0 0 10px #00ff00; }
+    .terminal-wrapper {
+      background: #1e1e1e;
+      border-radius: 8px;
+      padding: 20px;
+      height: 500px;
+    }
+    #terminal { height: 100%; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔌 Terminal API Demo</h1>
+
+    <div class="config">
+      <label>API URL:</label>
+      <input type="text" id="apiUrl" value="http://localhost:4000/api" />
+      <label>API Key:</label>
+      <input type="text" id="apiKey" value="your-secret-api-key" />
+      <button onclick="connect()">Connect</button>
+      <button onclick="disconnect()">Disconnect</button>
+    </div>
+
+    <div class="status">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">Not connected</span>
+    </div>
+
+    <div class="terminal-wrapper">
+      <div id="terminal"></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+  <script>
+    let terminal, fitAddon, ws, sessionId;
+
+    function initTerminal() {
+      terminal = new Terminal({
+        cursorBlink: true,
+        fontSize: 14,
+        theme: { background: '#1e1e1e', foreground: '#fff', cursor: '#00ff00' }
+      });
+      fitAddon = new FitAddon.FitAddon();
+      terminal.loadAddon(fitAddon);
+      terminal.open(document.getElementById('terminal'));
+      fitAddon.fit();
+      terminal.writeln('Click Connect to start');
+
+      terminal.onData((data) => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'input', data }));
+        }
+      });
+    }
+
+    async function connect() {
+      const apiUrl = document.getElementById('apiUrl').value;
+      const apiKey = document.getElementById('apiKey').value;
+
+      terminal.writeln('Creating session...');
+
+      const response = await fetch(`${apiUrl}/sessions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': apiKey
+        },
+        body: JSON.stringify({ userId: 'demo-user' })
+      });
+
+      const session = await response.json();
+      sessionId = session.sessionId;
+      terminal.writeln(`Session: ${sessionId.substring(0, 8)}`);
+
+      ws = new WebSocket(session.wsUrl);
+
+      ws.onopen = () => {
+        terminal.writeln('Connected!');
+        document.getElementById('statusDot').classList.add('connected');
+        document.getElementById('statusText').textContent = 'Connected';
+        ws.send(JSON.stringify({ type: 'start', cols: terminal.cols, rows: terminal.rows }));
+      };
+
+      ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'output') terminal.write(msg.data);
+      };
+
+      ws.onclose = () => {
+        terminal.writeln('\r\nDisconnected');
+        document.getElementById('statusDot').classList.remove('connected');
+        document.getElementById('statusText').textContent = 'Disconnected';
+      };
+    }
+
+    function disconnect() {
+      if (ws) ws.close();
+    }
+
+    window.onload = initTerminal;
+  </script>
+</body>
+</html>
