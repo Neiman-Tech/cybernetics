@@ -1,0 +1,310 @@
+#!/bin/bash
+
+# Full Stack Runner - Backend + Frontend with Cloudflare Tunnels
+
+set -e
+
+# Colors
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+echo_info() {
+    echo -e "${GREEN}[INFO]${NC} $1"
+}
+
+echo_warn() {
+    echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+# Configuration
+BACKEND_PORT=4000
+FRONTEND_PORT=3000  # Change if your frontend uses different port
+FRONTEND_DIR="./frontend"
+RESTART_COUNT=0
+
+# Cleanup function
+cleanup() {
+    echo ""
+    echo_info "Stopping all processes..."
+    pkill -f "node api-server.js" 2>/dev/null || true
+    pkill -f "cloudflared.*${BACKEND_PORT}" 2>/dev/null || true
+    pkill -f "cloudflared.*${FRONTEND_PORT}" 2>/dev/null || true
+    
+    # Stop frontend (try multiple common commands)
+    pkill -f "react-scripts" 2>/dev/null || true
+    pkill -f "vite" 2>/dev/null || true
+    pkill -f "next" 2>/dev/null || true
+    
+    rm -f /tmp/backend-tunnel.log /tmp/frontend-tunnel.log
+    echo_info "Cleanup complete"
+    exit 0
+}
+
+# Trap Ctrl+C
+trap cleanup INT TERM
+
+echo "================================================"
+echo "🚀 Full Stack Launcher"
+echo "================================================"
+echo ""
+
+# Check and install backend dependencies
+if [ ! -d "node_modules" ]; then
+    echo_info "Installing backend dependencies..."
+    npm install
+    echo_info "✓ Backend dependencies installed"
+fi
+
+# Kill any existing processes
+echo_info "Cleaning up existing processes..."
+pkill -f "node api-server.js" 2>/dev/null || true
+pkill -f "cloudflared" 2>/dev/null || true
+pkill -f "react-scripts" 2>/dev/null || true
+pkill -f "vite" 2>/dev/null || true
+pkill -f "next" 2>/dev/null || true
+rm -f /tmp/backend-tunnel.log /tmp/frontend-tunnel.log
+
+# Start Backend
+echo_info "Starting backend on port ${BACKEND_PORT}..."
+node api-server.js > /tmp/backend.log 2>&1 &
+BACKEND_PID=$!
+sleep 3
+
+if ! kill -0 $BACKEND_PID 2>/dev/null; then
+    echo_warn "Backend failed to start. Error log:"
+    cat /tmp/backend.log
+    exit 1
+fi
+
+echo_info "✓ Backend started (PID: $BACKEND_PID)"
+
+# Start Backend Tunnel
+echo_info "Creating backend tunnel..."
+cloudflared tunnel --url http://localhost:${BACKEND_PORT} > /tmp/backend-tunnel.log 2>&1 &
+BACKEND_TUNNEL_PID=$!
+
+# Check if frontend directory exists
+if [ ! -d "$FRONTEND_DIR" ]; then
+    echo_warn "Frontend directory not found: $FRONTEND_DIR"
+    echo_warn "Skipping frontend setup"
+    FRONTEND_SKIP=true
+else
+    FRONTEND_SKIP=false
+fi
+
+# Setup and Start Frontend
+if [ "$FRONTEND_SKIP" = false ]; then
+    echo_info "Setting up frontend..."
+    cd "$FRONTEND_DIR"
+    
+    # Install dependencies if needed
+    if [ ! -d "node_modules" ]; then
+        echo_info "Installing frontend dependencies..."
+        npm install
+    fi
+    
+    echo_info "Starting frontend on port ${FRONTEND_PORT}..."
+    
+    # Start frontend (works for React, Vite, Next.js)
+    if [ -f "package.json" ]; then
+        # Try to detect and use the right command
+        if grep -q "react-scripts" package.json; then
+            BROWSER=none PORT=${FRONTEND_PORT} npm start > /tmp/frontend.log 2>&1 &
+        elif grep -q "vite" package.json; then
+            npm run dev -- --port ${FRONTEND_PORT} > /tmp/frontend.log 2>&1 &
+        elif grep -q "next" package.json; then
+            npm run dev -- -p ${FRONTEND_PORT} > /tmp/frontend.log 2>&1 &
+        else
+            npm start > /tmp/frontend.log 2>&1 &
+        fi
+        
+        FRONTEND_PID=$!
+        cd ..
+        
+        sleep 5
+        
+        if ! kill -0 $FRONTEND_PID 2>/dev/null; then
+            echo_warn "Frontend failed to start. Check /tmp/frontend.log"
+        else
+            echo_info "✓ Frontend started (PID: $FRONTEND_PID)"
+            
+            # Start Frontend Tunnel
+            echo_info "Creating frontend tunnel..."
+            cloudflared tunnel --url http://localhost:${FRONTEND_PORT} > /tmp/frontend-tunnel.log 2>&1 &
+            FRONTEND_TUNNEL_PID=$!
+        fi
+    fi
+fi
+
+# Wait for backend tunnel URL first (critical for frontend .env)
+echo_info "Waiting for backend tunnel URL..."
+BACKEND_URL=""
+
+for i in {1..30}; do
+    if [ -f /tmp/backend-tunnel.log ]; then
+        BACKEND_URL=$(grep -o 'https://[a-z0-9\-]*\.trycloudflare\.com' /tmp/backend-tunnel.log | head -1)
+        if [ ! -z "$BACKEND_URL" ]; then
+            echo_info "✓ Backend tunnel URL: $BACKEND_URL"
+            break
+        fi
+    fi
+    sleep 1
+done
+
+if [ -z "$BACKEND_URL" ]; then
+    echo_warn "Backend tunnel URL not found after 30s"
+    BACKEND_URL="http://localhost:${BACKEND_PORT}"
+fi
+
+# Update frontend .env file with backend URL
+if [ "$FRONTEND_SKIP" = false ]; then
+    echo_info "Updating frontend .env with backend URL..."
+    ENV_FILE="${FRONTEND_DIR}/.env"
+    
+    # Backup existing .env if it exists
+    if [ -f "$ENV_FILE" ]; then
+        cp "$ENV_FILE" "${ENV_FILE}.backup"
+    fi
+    
+    # Write new .env file
+    cat > "$ENV_FILE" << ENV_CONTENT
+# API Configuration (Auto-generated by run-fullstack.sh)
+REACT_APP_API_URL=${BACKEND_URL}/api
+REACT_APP_API_KEY=your-secret-api-key
+
+# Generated at: $(date)
+# Backend URL: ${BACKEND_URL}
+
+# NOTE: The WebSocket connection will automatically use the same host
+# Examples:
+# - http://localhost:4000 → ws://localhost:4000/terminal
+# - https://api.example.com → wss://api.example.com/terminal
+ENV_CONTENT
+    
+    echo_info "✓ Frontend .env updated with: ${BACKEND_URL}/api"
+    
+    # If frontend is already running, warn about restart
+    if [ ! -z "$FRONTEND_PID" ]; then
+        echo_warn "Restarting frontend to pick up new .env..."
+        kill $FRONTEND_PID 2>/dev/null || true
+        sleep 2
+        
+        cd "$FRONTEND_DIR"
+        if grep -q "react-scripts" package.json; then
+            BROWSER=none PORT=${FRONTEND_PORT} npm start > /tmp/frontend.log 2>&1 &
+        elif grep -q "vite" package.json; then
+            npm run dev -- --port ${FRONTEND_PORT} > /tmp/frontend.log 2>&1 &
+        elif grep -q "next" package.json; then
+            npm run dev -- -p ${FRONTEND_PORT} > /tmp/frontend.log 2>&1 &
+        else
+            npm start > /tmp/frontend.log 2>&1 &
+        fi
+        FRONTEND_PID=$!
+        cd ..
+        sleep 5
+    fi
+fi
+
+# Wait for frontend tunnel URL
+echo_info "Waiting for frontend tunnel URL..."
+FRONTEND_URL=""
+
+if [ "$FRONTEND_SKIP" = false ]; then
+    for i in {1..30}; do
+        if [ -f /tmp/frontend-tunnel.log ]; then
+            FRONTEND_URL=$(grep -o 'https://[a-z0-9\-]*\.trycloudflare\.com' /tmp/frontend-tunnel.log | head -1)
+            if [ ! -z "$FRONTEND_URL" ]; then
+                break
+            fi
+        fi
+        sleep 1
+    done
+fi
+
+# Display Results
+echo ""
+echo "================================================"
+echo "🌐 Full Stack Running!"
+echo "================================================"
+echo ""
+echo -e "${CYAN}BACKEND:${NC}"
+echo "  Local:  http://localhost:${BACKEND_PORT}"
+if [ ! -z "$BACKEND_URL" ]; then
+    echo "  Public: $BACKEND_URL"
+    echo "  API:    ${BACKEND_URL}/api"
+else
+    echo "  Public: ⚠️  Tunnel still connecting..."
+fi
+echo ""
+
+if [ "$FRONTEND_SKIP" = false ]; then
+    echo -e "${CYAN}FRONTEND:${NC}"
+    echo "  Local:  http://localhost:${FRONTEND_PORT}"
+    if [ ! -z "$FRONTEND_URL" ]; then
+        echo "  Public: $FRONTEND_URL"
+    else
+        echo "  Public: ⚠️  Tunnel still connecting..."
+    fi
+    echo ""
+    echo -e "${CYAN}CONFIGURATION:${NC}"
+    echo "  .env file: ${FRONTEND_DIR}/.env"
+    echo "  API URL:   ${BACKEND_URL}/api"
+    echo ""
+fi
+
+echo "================================================"
+echo ""
+echo "💡 Tips:"
+echo "   Backend logs:  tail -f /tmp/backend.log"
+if [ "$FRONTEND_SKIP" = false ]; then
+    echo "   Frontend logs: tail -f /tmp/frontend.log"
+fi
+echo "   Stop all:      Press Ctrl+C"
+echo ""
+echo "✓ Ready to use! Press Ctrl+C to stop everything"
+echo ""
+
+# Monitor processes
+while true; do
+    # Check backend
+    if ! kill -0 $BACKEND_PID 2>/dev/null; then
+        echo_warn "Backend crashed! Restarting..."
+        node api-server.js > /tmp/backend.log 2>&1 &
+        BACKEND_PID=$!
+    fi
+    
+    # Check backend tunnel
+    if ! kill -0 $BACKEND_TUNNEL_PID 2>/dev/null; then
+        echo_warn "Backend tunnel crashed! Restarting..."
+        cloudflared tunnel --url http://localhost:${BACKEND_PORT} > /tmp/backend-tunnel.log 2>&1 &
+        BACKEND_TUNNEL_PID=$!
+    fi
+    
+    # Check frontend (if running) - with restart limit
+    if [ "$FRONTEND_SKIP" = false ] && [ ! -z "$FRONTEND_PID" ]; then
+        if ! kill -0 $FRONTEND_PID 2>/dev/null; then
+            RESTART_COUNT=$((RESTART_COUNT + 1))
+            
+            if [ $RESTART_COUNT -gt 3 ]; then
+                echo_warn "Frontend crashed too many times. Stopping auto-restart."
+                echo_warn "Check logs: tail -f /tmp/frontend.log"
+                FRONTEND_SKIP=true
+            else
+                echo_warn "Frontend crashed! Restarting... (attempt $RESTART_COUNT/3)"
+                cd "$FRONTEND_DIR"
+                npm start > /tmp/frontend.log 2>&1 &
+                FRONTEND_PID=$!
+                cd ..
+            fi
+        fi
+        
+        if ! kill -0 $FRONTEND_TUNNEL_PID 2>/dev/null; then
+            cloudflared tunnel --url http://localhost:${FRONTEND_PORT} > /tmp/frontend-tunnel.log 2>&1 &
+            FRONTEND_TUNNEL_PID=$!
+        fi
+    fi
+    
+    sleep 10
+done
