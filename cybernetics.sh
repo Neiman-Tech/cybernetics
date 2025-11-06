@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Full Stack Runner - Backend + Frontend with Cloudflare Tunnels
+rm frontend/.env
 
 set -e
 
@@ -19,7 +20,7 @@ echo_warn() {
 }
 
 # Configuration
-BACKEND_PORT=4000
+BACKEND_PORT=7860
 FRONTEND_PORT=3000  # Change if your frontend uses different port
 FRONTEND_DIR="./frontend"
 RESTART_COUNT=0
