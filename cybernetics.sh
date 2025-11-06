@@ -68,6 +68,27 @@ echo_info "Backend Port: ${BACKEND_PORT}"
 echo_info "Frontend Port: ${FRONTEND_PORT}"
 echo ""
 
+# Check if cloudflared is installed
+if ! command -v cloudflared &> /dev/null; then
+    echo_warn "cloudflared not found, installing..."
+    
+    # Download and install cloudflared
+    wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -O /tmp/cloudflared
+    chmod +x /tmp/cloudflared
+    sudo mv /tmp/cloudflared /usr/local/bin/cloudflared
+    
+    if command -v cloudflared &> /dev/null; then
+        echo_info "✓ cloudflared installed successfully"
+    else
+        echo_error "Failed to install cloudflared"
+        echo_error "Install manually: wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64"
+        exit 1
+    fi
+else
+    echo_info "✓ cloudflared is installed"
+fi
+echo ""
+
 # Check and install backend dependencies
 if [ ! -d "node_modules" ]; then
     echo_info "Installing backend dependencies..."
