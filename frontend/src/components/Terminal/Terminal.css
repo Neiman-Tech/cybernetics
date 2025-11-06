@@ -1,0 +1,41 @@
+.terminal-instance {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  padding: 18px;
+  background: var(--bg-secondary);
+}
+
+.terminal-instance .xterm {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+.terminal-instance .xterm-viewport {
+  overflow-y: auto !important;
+}
+
+.terminal-instance .xterm-screen {
+  height: 100% !important;
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .terminal-instance {
+    padding: 4px;
+  }
+  
+  .terminal-instance .xterm {
+    font-size: 12px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .terminal-instance {
+    padding: 2px;
+  }
+  
+  .terminal-instance .xterm {
+    font-size: 11px !important;
+  }
+}

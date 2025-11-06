@@ -1,0 +1,12 @@
+# netlify.toml
+
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = "build" 
+
+[build.environment]
+  # Set CI to false to disable the 'warnings as errors' rule.
+  CI = "false" 
+
+# ... rest of your file

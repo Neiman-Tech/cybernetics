@@ -1,0 +1,332 @@
+.explorer {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.explorer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.explorer-header h3 {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.explorer-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.icon-button {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  transition: all 0.15s ease;
+}
+
+.icon-button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.explorer-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.new-project-form {
+  padding: 20px;
+}
+
+.new-project-form form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.project-name-input {
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 3px;
+  font-size: 13px;
+}
+
+.project-name-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.new-project-form button {
+  padding: 8px 12px;
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.15s ease;
+}
+
+.new-project-form button:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.new-project-form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.empty-state {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.empty-state p {
+  margin-bottom: 12px;
+}
+
+.primary-button {
+  padding: 8px 16px;
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.15s ease;
+}
+
+.primary-button:hover {
+  background: var(--accent-hover);
+}
+
+/* Add these styles to your Explorer.css file */
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Modal Content */
+.modal-content {
+  background: var(--background-secondary, #1e1e1e);
+  border: 1px solid var(--border-color, #3e3e3e);
+  border-radius: 8px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Modal Header */
+.modal-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--border-color, #3e3e3e);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #ffffff);
+}
+
+.modal-header .warning-icon {
+  color: #f59e0b;
+  font-size: 24px;
+}
+
+/* Modal Body */
+.modal-body {
+  padding: 20px;
+}
+
+.modal-body p {
+  margin: 0 0 16px 0;
+  color: var(--text-secondary, #cccccc);
+  line-height: 1.5;
+}
+
+.modal-body p strong {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.modal-body ul {
+  margin: 16px 0;
+  padding-left: 24px;
+  color: var(--text-secondary, #cccccc);
+}
+
+.modal-body ul li {
+  margin: 8px 0;
+  line-height: 1.5;
+}
+
+/* Modal Footer */
+.modal-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-color, #3e3e3e);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* Modal Buttons */
+.modal-button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.modal-button.secondary {
+  background: var(--background-tertiary, #2a2a2a);
+  color: var(--text-primary, #ffffff);
+  border: 1px solid var(--border-color, #3e3e3e);
+}
+
+.modal-button.secondary:hover {
+  background: var(--background-hover, #333333);
+}
+
+.modal-button.danger {
+  background: #ef4444;
+  color: white;
+}
+
+.modal-button.danger:hover {
+  background: #dc2626;
+}
+
+/* Icon Button Variants */
+.icon-button.warning {
+  color: #f59e0b;
+}
+
+.icon-button.warning:hover {
+  background: rgba(245, 158, 11, 0.1);
+  color: #fbbf24;
+}
+
+.icon-button.danger {
+  color: #ef4444;
+}
+
+.icon-button.danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+}
+
+/* Startup Actions */
+.startup-actions {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  color: var(--accent-color, #007acc);
+  cursor: pointer;
+  font-size: 13px;
+  text-decoration: underline;
+  padding: 8px;
+  transition: opacity 0.2s ease;
+}
+
+.link-button:hover {
+  opacity: 0.8;
+}
+
+/* Spin Animation for Loading States */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .modal-content {
+    width: 95%;
+    margin: 0 10px;
+  }
+  
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding: 16px;
+  }
+  
+  .modal-footer {
+    flex-direction: column;
+  }
+  
+  .modal-button {
+    width: 100%;
+  }
+}

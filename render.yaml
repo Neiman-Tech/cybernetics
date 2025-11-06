@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: web-terminal-ide
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_KEY
+        generateValue: true
+    healthCheckPath: /api/health
+    autoDeploy: true

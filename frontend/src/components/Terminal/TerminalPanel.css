@@ -1,0 +1,500 @@
+/* Enhanced Terminal Panel Container */
+.terminal-panel-container-enhanced {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  position: relative;
+  width: 100%;
+}
+
+.terminal-panel-resizer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  cursor: ns-resize;
+  background: transparent;
+  z-index: 10;
+}
+
+.terminal-panel-resizer:hover {
+  background: var(--accent-color);
+}
+
+/* Enhanced Header */
+.terminal-panel-header-enhanced {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  height: 35px;
+  flex-shrink: 0;
+}
+
+.terminal-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex: 1;
+  overflow-x: auto;
+}
+
+.terminal-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 35px;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  position: relative;
+}
+
+.terminal-tab:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.terminal-tab.active {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--accent-color);
+}
+
+.tab-label {
+  user-select: none;
+}
+
+.tab-badge {
+  background: var(--accent-color);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  min-width: 18px;
+  text-align: center;
+}
+
+.terminal-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border-color);
+  margin: 0 4px;
+}
+
+.terminal-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 8px;
+}
+
+.terminal-action-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  transition: all 0.15s ease;
+}
+
+.terminal-action-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* Sub-tabs (Terminal instances) */
+.terminal-subtabs {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  overflow-x: auto;
+  height: 30px;
+}
+
+.terminal-subtab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 30px;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  position: relative;
+}
+
+.terminal-subtab:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.terminal-subtab.active {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.terminal-subtab.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent-color);
+}
+
+.subtab-label {
+  user-select: none;
+}
+
+.subtab-close {
+  opacity: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  border-radius: 2px;
+  transition: all 0.15s ease;
+  margin-left: 4px;
+}
+
+.terminal-subtab:hover .subtab-close {
+  opacity: 1;
+}
+
+.subtab-close:hover {
+  background: var(--error-color);
+  color: white;
+}
+
+/* Enhanced Content Area */
+.terminal-panel-content-enhanced {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  background: var(--bg-primary);
+}
+
+.terminal-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-secondary);
+  gap: 16px;
+}
+
+.terminal-empty-state p {
+  font-size: 14px;
+  margin: 0;
+}
+
+/* Ports Panel */
+.ports-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+}
+
+.ports-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ports-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.port-action-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  border-radius: 3px;
+  transition: all 0.15s ease;
+}
+
+.port-action-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.ports-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  padding: 40px;
+  text-align: center;
+}
+
+.ports-empty p {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.ports-empty small {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.ports-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.ports-list-header {
+  display: grid;
+  grid-template-columns: 100px 100px 1fr 80px;
+  gap: 16px;
+  padding: 8px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.port-item {
+  display: grid;
+  grid-template-columns: 100px 100px 1fr 80px;
+  gap: 16px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 12px;
+  color: var(--text-primary);
+  align-items: center;
+  transition: background 0.15s ease;
+}
+
+.port-item:hover {
+  background: var(--bg-hover);
+}
+
+.port-col-port {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.port-status-indicator {
+  flex-shrink: 0;
+}
+
+.port-status-indicator.running {
+  color: var(--success-color);
+}
+
+.port-col-status {
+  display: flex;
+  align-items: center;
+}
+
+.port-status-badge {
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.port-status-badge.running {
+  background: rgba(137, 209, 133, 0.2);
+  color: var(--success-color);
+}
+
+.port-col-address {
+  font-family: 'Consolas', monospace;
+  color: var(--text-secondary);
+}
+
+.port-col-actions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.port-action-icon {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  border-radius: 3px;
+  transition: all 0.15s ease;
+}
+
+.port-action-icon:hover {
+  background: var(--bg-active);
+  color: var(--accent-color);
+}
+
+.ports-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.ports-footer small {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* Problems Panel */
+.problems-panel,
+.debug-panel,
+.output-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+}
+
+.problems-empty,
+.debug-empty,
+.output-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  gap: 12px;
+}
+
+.problems-empty p,
+.debug-empty p,
+.output-empty p {
+  font-size: 14px;
+  margin: 0;
+}
+
+.debug-empty small {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Output Panel */
+.output-header {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.output-source-selector {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.output-source-selector:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.output-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .terminal-panel-header-enhanced {
+    height: 40px;
+  }
+  
+  .terminal-tab {
+    font-size: 10px;
+    padding: 0 8px;
+  }
+  
+  .tab-label {
+    display: none;
+  }
+  
+  .terminal-subtabs {
+    height: 32px;
+  }
+  
+  .terminal-subtab {
+    padding: 0 8px;
+    font-size: 11px;
+  }
+  
+  .ports-list-header {
+    grid-template-columns: 80px 80px 1fr 60px;
+    gap: 8px;
+    padding: 8px;
+    font-size: 10px;
+  }
+  
+  .port-item {
+    grid-template-columns: 80px 80px 1fr 60px;
+    gap: 8px;
+    padding: 8px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .terminal-tabs {
+    overflow-x: auto;
+  }
+  
+  .terminal-actions {
+    gap: 0;
+  }
+  
+  .terminal-action-btn {
+    padding: 4px;
+  }
+}

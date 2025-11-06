@@ -1,0 +1,135 @@
+:root[data-theme="dark"] {
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #252526;
+  --bg-tertiary: #2d2d30;
+  --bg-hover: #2a2d2e;
+  --bg-active: #37373d;
+  --border-color: #3e3e42;
+  --text-primary: #cccccc;
+  --text-secondary: #969696;
+  --text-muted: #6d6d6d;
+  --accent-color: #007acc;
+  --accent-hover: #005a9e;
+  --error-color: #f48771;
+  --warning-color: #cca700;
+  --success-color: #89d185;
+  --scrollbar-track: #1e1e1e;
+  --scrollbar-thumb: #424242;
+  --scrollbar-thumb-hover: #4f4f4f;
+  --selection-bg: #264f78;
+  --selection-color: #ffffff;
+}
+
+:root[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f3f3f3;
+  --bg-tertiary: #ececec;
+  --bg-hover: #e8e8e8;
+  --bg-active: #d6d6d6;
+  --border-color: #d4d4d4;
+  --text-primary: #000;
+  --text-secondary: #6c6c6c;
+  --text-muted: #959595;
+  --accent-color: #0066bf;
+  --accent-hover: #005ba1;
+  --error-color: #e51400;
+  --warning-color: #bf8803;
+  --success-color: #388a34;
+  --scrollbar-track: #f3f3f3;
+  --scrollbar-thumb: #c1c1c1;
+  --scrollbar-thumb-hover: #a6a6a6;
+  --selection-bg: #add6ff;
+  --selection-color: #000000;
+}
+
+.ide {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: row;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+.ide-main {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.ide-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.fullpage-terminal {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .ide {
+    flex-direction: column;
+  }
+  
+  .ide-main {
+    flex-direction: column;
+  }
+  
+  .sidebar {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+    max-height: 40vh;
+  }
+  
+  .activity-bar {
+    width: 100%;
+    height: 48px;
+    flex-direction: row;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .activity-bar-items {
+    flex-direction: row;
+    padding: 0 8px;
+  }
+  
+  .activity-bar-bottom {
+    flex-direction: row;
+    padding: 0 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .sidebar {
+    max-height: 35vh;
+  }
+  
+  .activity-bar {
+    height: 40px;
+  }
+  
+  .activity-bar-item {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* Tablet Responsive */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .sidebar {
+    max-width: 200px;
+  }
+}
