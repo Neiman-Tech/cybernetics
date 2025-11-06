@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # Full Stack Runner - Backend + Frontend with Cloudflare Tunnels
-rm frontend/.env
 
 set -e
 
