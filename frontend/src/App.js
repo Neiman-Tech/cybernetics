@@ -20,7 +20,7 @@ function App() {
     console.log('👋 Logging out:', username);
     
     try {
-      await window.storage.delete('ide_username');
+      localStorage.removeItem('ide_username');
       console.log('✓ Session cleared from storage');
     } catch (error) {
       console.warn('⚠️ Could not clear storage:', error);

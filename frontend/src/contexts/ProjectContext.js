@@ -96,7 +96,7 @@ export const ProjectProvider = ({ children, username }) => {
 
   const createUserProject = async () => {
     try {
-      const username = await window.storage.get('ide_username');
+      const username = localStorage.getItem('ide_username');
       console.log('🆕 Creating project for user:', username);
       
       const url = `${API_URL}/api/projects`;

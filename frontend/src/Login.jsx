@@ -28,14 +28,10 @@ export default function Login({ onLoginSuccess }) {
   const checkStoredSession = async () => {
     try {
       // Check if window.storage exists
-      if (!window.storage) {
-        console.warn('⚠️ window.storage not available');
-        setChecking(false);
-        return;
-      }
+      
 
-      const result = await window.storage.get('ide_username');
-      if (result && result.value) {
+      const result = localStorage.getItem('ide_username');
+      if (result) {
         console.log('✓ Found stored session:', result.value);
         // Skip verification, trust the stored session
         onLoginSuccess(result.value);
@@ -91,11 +87,12 @@ export default function Login({ onLoginSuccess }) {
       });
 
       const data = await response.json();
-
+      const user = localStorage.get('ide_username');
       if (response.ok) {
         try {
-          if (window.storage) {
-            const saveResult = await window.storage.set('ide_username', username);
+            
+          if (!user) {
+            const saveResult = localStorage.setItem('ide_username', username);
             if (saveResult) {
               console.log('✓ Session saved to storage successfully');
             } else {
