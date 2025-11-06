@@ -87,7 +87,7 @@ export default function Login({ onLoginSuccess }) {
       });
 
       const data = await response.json();
-      const user = localStorage.get('ide_username');
+      const user = localStorage.getItem('ide_username');
       if (response.ok) {
         try {
             
