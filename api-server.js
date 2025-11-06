@@ -235,13 +235,7 @@ function syncDirectoryToMeta(username, relativePath = '') {
   }
 }
 
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'X-API-Key', 'Authorization'],
-  credentials: true,
-  optionsSuccessStatus: 200
-}));
+app.use(cors());
 
 app.options('*', cors());
 app.use(express.json({ limit: '50mb' }));
