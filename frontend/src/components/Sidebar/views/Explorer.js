@@ -1,7 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useProject } from '../../../contexts/ProjectContext';
 import FileTree from '../../FileTree/FileTree';
-import { VscNewFile, VscNewFolder, VscRefresh, VscSync, VscTerminal, VscTrash, VscWarning } from 'react-icons/vsc';
+import { 
+  VscNewFile, 
+  VscNewFolder, 
+  VscRefresh, 
+  VscSync, 
+  VscTerminal, 
+  VscTrash, 
+  VscWarning,
+  VscLoading 
+} from 'react-icons/vsc';
 import './Explorer.css';
 
 const BASE_URL = process.env.REACT_APP_API_URL || '';
@@ -15,65 +24,61 @@ const Explorer = () => {
     setFiles,
     createProject, 
     isLoading,
+    isSyncing,
+    refreshFiles,
+    checkSyncStatus,
   } = useProject();
   
   const [projectName, setProjectName] = useState('');
   const [showNewProject, setShowNewProject] = useState(!currentProject);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [isManualSyncing, setIsManualSyncing] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState(null);
 
-  // Get username - try multiple sources
   const getUsername = useCallback(() => {
-    const storedUsername = localStorage.getItem('username');
+    const storedUsername = localStorage.getItem('ide_username');
     if (storedUsername) return storedUsername;
-    
     if (currentProject?.userId) return currentProject.userId;
     if (currentProject?._id) return currentProject._id;
-    
     return null;
   }, [currentProject]);
 
   useEffect(() => {
-    console.log('🔄 Explorer: currentProject changed', currentProject);
     setShowNewProject(!currentProject);
-    
     if (currentProject?._id) {
       loadFilesFromDatabase();
     }
-  }, [currentProject?._id]); // Only depend on _id, not entire object
+  }, [currentProject?._id]);
+
+  // Monitor sync status
+  useEffect(() => {
+    if (!currentProject?._id) return;
+
+    const checkInterval = setInterval(async () => {
+      const status = await checkSyncStatus();
+      if (status && !status.syncing && !status.queued) {
+        setIsManualSyncing(false);
+      }
+    }, 1000);
+
+    return () => clearInterval(checkInterval);
+  }, [currentProject, checkSyncStatus]);
 
   const loadFilesFromDatabase = useCallback(async () => {
     const username = getUsername();
-    
-    if (!currentProject?._id || !username) {
-      return;
-    }
+    if (!currentProject?._id || !username) return;
 
     try {
       setIsRefreshing(true);
-
-      const response = await fetch(
-        `${API_URL}/api/files?username=${username}`,
-        {
-          headers: { 'X-API-Key': API_KEY }
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log('✅ Files loaded:', data.files?.length || 0);
-
-      setFiles(data.files || []);
+      const newFiles = await refreshFiles(true);
+      setLastSyncTime(new Date());
     } catch (error) {
       console.error('❌ Failed to load files:', error);
     } finally {
       setIsRefreshing(false);
     }
-  }, [currentProject?._id, getUsername, setFiles]);
+  }, [currentProject?._id, getUsername, refreshFiles]);
 
   const handleCreateProject = async (e) => {
     e.preventDefault();
@@ -90,26 +95,17 @@ const Explorer = () => {
   };
 
   const handleNewFile = async () => {
-    const fileName = prompt('Enter file name (e.g., src/app.js or index.html):');
-    if (!fileName || !fileName.trim()) return;
+    const fileName = prompt('Enter file name (e.g., src/app.js):');
+    if (!fileName?.trim()) return;
 
     const username = getUsername();
-
-    if (!currentProject?._id) {
-      alert('No project selected');
-      return;
-    }
-
-    if (!username) {
-      alert('User not authenticated. Please log in again.');
+    if (!currentProject?._id || !username) {
+      alert('No project selected or user not authenticated');
       return;
     }
 
     try {
-      const cleanPath = fileName.trim().replace(/^\/+/, '').replace(/\/+$/, '');
-      
-      console.log('📄 Creating file:', cleanPath);
-
+      const cleanPath = fileName.trim().replace(/^\/+/, '');
       const response = await fetch(`${API_URL}/api/files`, {
         method: 'POST',
         headers: {
@@ -117,7 +113,7 @@ const Explorer = () => {
           'X-API-Key': API_KEY
         },
         body: JSON.stringify({
-          username: username,
+          username,
           path: cleanPath,
           content: '',
           type: 'file'
@@ -130,10 +126,7 @@ const Explorer = () => {
       }
 
       const result = await response.json();
-      
-      // Optimistically update UI instead of reloading all files
       setFiles(prevFiles => [...prevFiles, result.file]);
-      
       console.log('✅ File created:', result.file.path);
     } catch (error) {
       console.error('❌ Failed to create file:', error);
@@ -142,26 +135,17 @@ const Explorer = () => {
   };
 
   const handleNewFolder = async () => {
-    const folderName = prompt('Enter folder name (e.g., src or components/ui):');
-    if (!folderName || !folderName.trim()) return;
+    const folderName = prompt('Enter folder name (e.g., components):');
+    if (!folderName?.trim()) return;
 
     const username = getUsername();
-
-    if (!currentProject?._id) {
-      alert('No project selected');
-      return;
-    }
-
-    if (!username) {
-      alert('User not authenticated. Please log in again.');
+    if (!currentProject?._id || !username) {
+      alert('No project selected or user not authenticated');
       return;
     }
 
     try {
-      const cleanPath = folderName.trim().replace(/^\/+/, '').replace(/\/+$/, '');
-      
-      console.log('📁 Creating folder:', cleanPath);
-
+      const cleanPath = folderName.trim().replace(/^\/+/, '');
       const response = await fetch(`${API_URL}/api/files`, {
         method: 'POST',
         headers: {
@@ -169,7 +153,7 @@ const Explorer = () => {
           'X-API-Key': API_KEY
         },
         body: JSON.stringify({
-          username: username,
+          username,
           path: cleanPath,
           content: '',
           type: 'folder'
@@ -182,10 +166,7 @@ const Explorer = () => {
       }
 
       const result = await response.json();
-      
-      // Optimistically update UI instead of reloading all files
       setFiles(prevFiles => [...prevFiles, result.file]);
-      
       console.log('✅ Folder created:', result.file.path);
     } catch (error) {
       console.error('❌ Failed to create folder:', error);
@@ -195,20 +176,14 @@ const Explorer = () => {
 
   const handleSyncFromTerminal = async () => {
     const username = getUsername();
-
-    if (!currentProject?._id) {
-      alert('No project selected');
+    if (!currentProject?._id || !username) {
+      alert('No project selected or user not authenticated');
       return;
     }
 
-    if (!username) {
-      alert('User not authenticated. Please log in again.');
-      return;
-    }
-
-    setIsSyncing(true);
+    setIsManualSyncing(true);
     try {
-      console.log('🔄 Syncing filesystem to database...');
+      console.log('🔄 Triggering sync...');
 
       const response = await fetch(`${API_URL}/api/projects/${username}/sync`, {
         method: 'POST',
@@ -223,30 +198,30 @@ const Explorer = () => {
         throw new Error(error.error || 'Failed to sync project');
       }
 
-      console.log('✅ Sync complete');
-
-      // Reload files after sync
-      await loadFilesFromDatabase();
+      console.log('✅ Sync queued');
       
-      alert('✅ Files synced successfully!');
+      // Keep refreshing files while syncing
+      const refreshInterval = setInterval(async () => {
+        await refreshFiles();
+        const status = await checkSyncStatus();
+        if (!status?.syncing && !status?.queued) {
+          clearInterval(refreshInterval);
+          setIsManualSyncing(false);
+          setLastSyncTime(new Date());
+        }
+      }, 500); // Refresh every 500ms during sync
+
     } catch (error) {
       console.error('❌ Sync failed:', error);
       alert('Failed to sync project: ' + error.message);
-    } finally {
-      setTimeout(() => setIsSyncing(false), 500);
+      setIsManualSyncing(false);
     }
   };
 
   const handleLoadFromDatabase = async () => {
     const username = getUsername();
-
-    if (!currentProject?._id) {
-      alert('No project selected');
-      return;
-    }
-
-    if (!username) {
-      alert('User not authenticated. Please log in again.');
+    if (!currentProject?._id || !username) {
+      alert('No project selected or user not authenticated');
       return;
     }
 
@@ -270,33 +245,26 @@ const Explorer = () => {
       const result = await response.json();
       console.log('✅ Project loaded:', result.filesLoaded, 'files');
 
-      await loadFilesFromDatabase();
-      
+      await refreshFiles();
+      setLastSyncTime(new Date());
       alert(`✅ Loaded ${result.filesLoaded} files successfully!`);
     } catch (error) {
       console.error('❌ Load failed:', error);
       alert('Failed to load project: ' + error.message);
     } finally {
-      setTimeout(() => setIsRefreshing(false), 500);
+      setIsRefreshing(false);
     }
   };
 
   const handleCompleteReset = async () => {
     setShowResetModal(false);
-    
     const username = getUsername();
     
     if (!currentProject?._id || !username) {
-      alert('No project to reset or user not authenticated');
+      alert('No project to reset');
       return;
     }
 
-    const confirmDelete = window.confirm(
-      '⚠️ FINAL WARNING!\n\nThis will DELETE ALL FILES permanently.\n\nType "DELETE" in the next prompt to confirm.'
-    );
-    
-    if (!confirmDelete) return;
-    
     const confirmation = prompt('Type DELETE to confirm:');
     if (confirmation !== 'DELETE') {
       alert('Reset cancelled');
@@ -304,20 +272,13 @@ const Explorer = () => {
     }
 
     try {
-      console.log('🗑️ Starting complete reset...');
-      
       const filesResponse = await fetch(
         `${API_URL}/api/files?username=${username}`,
-        {
-          headers: { 'X-API-Key': API_KEY }
-        }
+        { headers: { 'X-API-Key': API_KEY } }
       );
       
       if (filesResponse.ok) {
         const { files: serverFiles } = await filesResponse.json();
-        console.log(`📊 Deleting ${serverFiles.length} files...`);
-        
-        // Delete in parallel for better performance
         await Promise.all(
           serverFiles.map(file =>
             fetch(`${API_URL}/api/files/${file._id}?username=${username}`, {
@@ -328,11 +289,8 @@ const Explorer = () => {
         );
       }
       
-      console.log('✅ All files deleted');
       setFiles([]);
-      
-      alert('✅ Reset complete! All files deleted.');
-      
+      alert('✅ Reset complete!');
     } catch (error) {
       console.error('❌ Reset failed:', error);
       alert('⚠️ Reset failed: ' + error.message);
@@ -348,13 +306,7 @@ const Explorer = () => {
         </div>
         <div className="modal-body">
           <p><strong>⚠️ WARNING: This action cannot be undone!</strong></p>
-          <p>This will permanently delete:</p>
-          <ul>
-            <li>ALL files from the database</li>
-            <li>ALL files from the filesystem</li>
-            <li>Project will be empty</li>
-          </ul>
-          <p>Are you absolutely sure?</p>
+          <p>This will permanently delete ALL files.</p>
         </div>
         <div className="modal-footer">
           <button 
@@ -420,31 +372,31 @@ const Explorer = () => {
           </button>
           <button 
             onClick={handleSyncFromTerminal}
-            title={isSyncing ? "Syncing..." : "Sync Terminal → Database"}
-            className={`icon-button ${isSyncing ? 'syncing' : ''}`}
-            disabled={isSyncing}
+            title={isManualSyncing || isSyncing ? "Syncing..." : "Sync Terminal → Database"}
+            className={`icon-button ${isManualSyncing || isSyncing ? 'syncing' : ''}`}
+            disabled={isManualSyncing || isSyncing}
           >
-            <VscTerminal className={isSyncing ? 'spin' : ''} />
+            {isManualSyncing || isSyncing ? <VscLoading className="spin" /> : <VscTerminal />}
           </button>
           <button 
             onClick={handleLoadFromDatabase}
-            title={isRefreshing ? "Loading..." : "Load Database → Filesystem"}
-            className={`icon-button ${isRefreshing ? 'syncing' : ''}`}
+            title="Load Database → Filesystem"
+            className="icon-button"
             disabled={isRefreshing}
           >
             <VscSync className={isRefreshing ? 'spin' : ''} />
           </button>
           <button 
             onClick={loadFilesFromDatabase}
-            title={isRefreshing ? "Refreshing..." : "Refresh File List"}
-            className={`icon-button ${isRefreshing ? 'syncing' : ''}`}
+            title="Refresh File List"
+            className="icon-button"
             disabled={isRefreshing}
           >
             <VscRefresh className={isRefreshing ? 'spin' : ''} />
           </button>
           <button
             onClick={() => setShowResetModal(true)}
-            title="Complete Reset - Delete All Files"
+            title="Complete Reset"
             className="icon-button danger"
           >
             <VscTrash />
@@ -453,9 +405,9 @@ const Explorer = () => {
       </div>
       
       <div className="explorer-content">
-        {isRefreshing ? (
+        {isRefreshing && files.length === 0 ? (
           <div className="loading-state">
-            <VscSync className="spin" />
+            <VscLoading className="spin" />
             <p>Loading files...</p>
           </div>
         ) : files.length === 0 ? (
@@ -469,17 +421,39 @@ const Explorer = () => {
             </button>
           </div>
         ) : (
-          <FileTree files={files} />
+          <>
+            <FileTree files={files} />
+            {(isManualSyncing || isSyncing) && (
+              <div className="sync-indicator">
+                <VscLoading className="spin" />
+                <span>Syncing files...</span>
+              </div>
+            )}
+          </>
         )}
       </div>
       
       <div className="explorer-footer">
         <div className="sync-status">
-          <VscSync className="sync-icon" />
-          <span>Auto-sync active</span>
+          {isSyncing || isManualSyncing ? (
+            <>
+              <VscLoading className="sync-icon spin" />
+              <span>Syncing...</span>
+            </>
+          ) : (
+            <>
+              <VscSync className="sync-icon" />
+              <span>Auto-sync active</span>
+            </>
+          )}
         </div>
         <div className="file-count">
           {files.length} {files.length === 1 ? 'file' : 'files'}
+          {lastSyncTime && (
+            <span className="last-sync">
+              · Last synced {Math.round((Date.now() - lastSyncTime) / 1000)}s ago
+            </span>
+          )}
         </div>
       </div>
       

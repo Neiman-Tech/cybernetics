@@ -5,7 +5,8 @@ const pty = require('node-pty');
 const { v4: uuidv4 } = require('uuid');
 const cors = require('cors');
 const path = require('path');
-const fs = require('fs');
+const fs = require('fs').promises; // Use promises API
+const fsSync = require('fs'); // Keep sync for some operations
 const simpleGit = require('simple-git');
 const crypto = require('crypto');
 require("dotenv").config();
@@ -16,7 +17,7 @@ const wss = new WebSocket.Server({ server });
 
 // Environment configuration
 const NODE_ENV = process.env.NODE_ENV || 'development';
-const IS_DOCKER = process.env.IS_DOCKER === 'true' || fs.existsSync('/.dockerenv');
+const IS_DOCKER = process.env.IS_DOCKER === 'true' || fsSync.existsSync('/.dockerenv');
 const IS_TEST_MODE = NODE_ENV === 'development' && !IS_DOCKER;
 const PORT = parseInt(process.env.PORT, 10) || 7860;
 const API_KEY = process.env.API_KEY || 'your-secret-api-key';
@@ -34,16 +35,20 @@ console.log('Port:', PORT);
 
 // Ensure directories exist
 [WORKSPACE_ROOT, USERS_DIR].forEach(dir => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true, mode: 0o755 });
+  if (!fsSync.existsSync(dir)) {
+    fsSync.mkdirSync(dir, { recursive: true, mode: 0o755 });
   }
 });
+
+// Sync queue management
+const syncQueues = new Map(); // username -> { syncing: boolean, queued: boolean }
+const syncLocks = new Map(); // username -> promise
 
 // User Management Functions
 function loadUsers() {
   try {
-    if (fs.existsSync(USERS_FILE)) {
-      return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+    if (fsSync.existsSync(USERS_FILE)) {
+      return JSON.parse(fsSync.readFileSync(USERS_FILE, 'utf8'));
     }
   } catch (error) {
     console.error('Error loading users:', error);
@@ -53,7 +58,7 @@ function loadUsers() {
 
 function saveUsers(users) {
   try {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf8');
+    fsSync.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf8');
   } catch (error) {
     console.error('Error saving users:', error);
   }
@@ -80,11 +85,12 @@ function getFilesMetaFile(username) {
 }
 
 // JSON Storage Functions (per user)
-function loadProjectMeta(username) {
+async function loadProjectMeta(username) {
   try {
     const metaFile = getProjectMetaFile(username);
-    if (fs.existsSync(metaFile)) {
-      return JSON.parse(fs.readFileSync(metaFile, 'utf8'));
+    if (fsSync.existsSync(metaFile)) {
+      const content = await fs.readFile(metaFile, 'utf8');
+      return JSON.parse(content);
     }
   } catch (error) {
     console.error('Error loading project meta:', error);
@@ -105,24 +111,25 @@ function loadProjectMeta(username) {
   };
 }
 
-function saveProjectMeta(username, project) {
+async function saveProjectMeta(username, project) {
   try {
     const dataDir = getUserDataDir(username);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
+    if (!fsSync.existsSync(dataDir)) {
+      await fs.mkdir(dataDir, { recursive: true });
     }
     project.updatedAt = new Date().toISOString();
-    fs.writeFileSync(getProjectMetaFile(username), JSON.stringify(project, null, 2), 'utf8');
+    await fs.writeFile(getProjectMetaFile(username), JSON.stringify(project, null, 2), 'utf8');
   } catch (error) {
     console.error('Error saving project meta:', error);
   }
 }
 
-function loadFilesMeta(username) {
+async function loadFilesMeta(username) {
   try {
     const filesFile = getFilesMetaFile(username);
-    if (fs.existsSync(filesFile)) {
-      return JSON.parse(fs.readFileSync(filesFile, 'utf8'));
+    if (fsSync.existsSync(filesFile)) {
+      const content = await fs.readFile(filesFile, 'utf8');
+      return JSON.parse(content);
     }
   } catch (error) {
     console.error('Error loading files meta:', error);
@@ -130,58 +137,59 @@ function loadFilesMeta(username) {
   return [];
 }
 
-function saveFilesMeta(username, files) {
+async function saveFilesMeta(username, files) {
   try {
     const dataDir = getUserDataDir(username);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
+    if (!fsSync.existsSync(dataDir)) {
+      await fs.mkdir(dataDir, { recursive: true });
     }
-    fs.writeFileSync(getFilesMetaFile(username), JSON.stringify(files, null, 2), 'utf8');
+    await fs.writeFile(getFilesMetaFile(username), JSON.stringify(files, null, 2), 'utf8');
   } catch (error) {
     console.error('Error saving files meta:', error);
   }
 }
 
 // Initialize user project
-function initializeUserProject(username) {
+async function initializeUserProject(username) {
   const userPath = getUserProjectPath(username);
   const dataDir = getUserDataDir(username);
   
-  [userPath, dataDir].forEach(dir => {
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true, mode: 0o755 });
+  for (const dir of [userPath, dataDir]) {
+    if (!fsSync.existsSync(dir)) {
+      await fs.mkdir(dir, { recursive: true, mode: 0o755 });
     }
-  });
+  }
   
-  let project = loadProjectMeta(username);
-  saveProjectMeta(username, project);
+  let project = await loadProjectMeta(username);
+  await saveProjectMeta(username, project);
   
   const gitDir = path.join(userPath, '.git');
-  if (!fs.existsSync(gitDir)) {
+  if (!fsSync.existsSync(gitDir)) {
     try {
       const git = simpleGit(userPath);
-      git.init();
-      git.addConfig('user.name', username);
-      git.addConfig('user.email', `${username}@webide.dev`);
+      await git.init();
+      await git.addConfig('user.name', username);
+      await git.addConfig('user.email', `${username}@webide.dev`);
     } catch (error) {
       console.warn('Git init failed:', error.message);
     }
   }
 }
 
-// Sync functions
-function syncFileToMeta(username, filePath) {
+// Improved async sync functions with batching
+async function syncFileToMeta(username, filePath, filesMeta) {
   try {
     const userPath = getUserProjectPath(username);
     const fullPath = path.join(userPath, filePath);
-    const filesMeta = loadFilesMeta(username);
     
-    if (!fs.existsSync(fullPath)) {
-      saveFilesMeta(username, filesMeta.filter(f => f.path !== filePath));
-      return;
+    try {
+      await fs.access(fullPath);
+    } catch {
+      // File doesn't exist, remove from meta
+      return filesMeta.filter(f => f.path !== filePath);
     }
 
-    const stats = fs.statSync(fullPath);
+    const stats = await fs.stat(fullPath);
     const existingIndex = filesMeta.findIndex(f => f.path === filePath);
     
     const fileData = {
@@ -194,7 +202,7 @@ function syncFileToMeta(username, filePath) {
     };
     
     if (!stats.isDirectory()) {
-      const content = fs.readFileSync(fullPath, 'utf8');
+      const content = await fs.readFile(fullPath, 'utf8');
       fileData.content = content;
       fileData.size = Buffer.byteLength(content, 'utf8');
     }
@@ -205,39 +213,136 @@ function syncFileToMeta(username, filePath) {
       filesMeta.push(fileData);
     }
     
-    saveFilesMeta(username, filesMeta);
+    return filesMeta;
   } catch (error) {
     console.error('Sync file error:', error);
+    return filesMeta;
   }
 }
 
-function syncDirectoryToMeta(username, relativePath = '') {
+async function syncDirectoryToMetaBatch(username, relativePath = '', filesMeta = null, maxDepth = 10, currentDepth = 0) {
+  if (currentDepth > maxDepth) {
+    console.warn(`Max depth reached for ${relativePath}`);
+    return filesMeta || [];
+  }
+
   try {
     const userPath = getUserProjectPath(username);
     const currentPath = path.join(userPath, relativePath);
-    const items = fs.readdirSync(currentPath);
+    
+    let items;
+    try {
+      items = await fs.readdir(currentPath);
+    } catch (error) {
+      console.error(`Cannot read directory ${currentPath}:`, error.message);
+      return filesMeta || [];
+    }
 
-    for (const item of items) {
-      if (['.git', 'node_modules', '.bashrc', '.data'].includes(item)) continue;
+    if (filesMeta === null) {
+      filesMeta = await loadFilesMeta(username);
+    }
 
-      const itemRelativePath = path.join(relativePath, item);
-      const itemFullPath = path.join(currentPath, item);
-      const stats = fs.statSync(itemFullPath);
+    // Filter out excluded items
+    const filteredItems = items.filter(item => 
+      !['.git', 'node_modules', '.bashrc', '.data'].includes(item)
+    );
 
-      syncFileToMeta(username, itemRelativePath);
+    // Process in batches to avoid overwhelming the system
+    const BATCH_SIZE = 50;
+    for (let i = 0; i < filteredItems.length; i += BATCH_SIZE) {
+      const batch = filteredItems.slice(i, i + BATCH_SIZE);
       
-      if (stats.isDirectory()) {
-        syncDirectoryToMeta(username, itemRelativePath);
+      await Promise.all(batch.map(async (item) => {
+        const itemRelativePath = path.join(relativePath, item);
+        const itemFullPath = path.join(currentPath, item);
+        
+        try {
+          const stats = await fs.stat(itemFullPath);
+          filesMeta = await syncFileToMeta(username, itemRelativePath, filesMeta);
+          
+          if (stats.isDirectory()) {
+            filesMeta = await syncDirectoryToMetaBatch(username, itemRelativePath, filesMeta, maxDepth, currentDepth + 1);
+          }
+        } catch (error) {
+          console.error(`Error processing ${itemRelativePath}:`, error.message);
+        }
+      }));
+
+      // Save after each batch to prevent data loss
+      if (i % (BATCH_SIZE * 2) === 0) {
+        await saveFilesMeta(username, filesMeta);
       }
     }
+
+    return filesMeta;
   } catch (error) {
     console.error('Sync directory error:', error);
+    return filesMeta || [];
   }
 }
 
-app.use(cors());
+// Debounced sync with queue management
+async function queuedSync(username) {
+  // Initialize queue state
+  if (!syncQueues.has(username)) {
+    syncQueues.set(username, { syncing: false, queued: false });
+  }
+
+  const queue = syncQueues.get(username);
+
+  // If already syncing, mark as queued and return
+  if (queue.syncing) {
+    queue.queued = true;
+    console.log(`⏳ Sync queued for user: ${username}`);
+    return;
+  }
+
+  // Start syncing
+  queue.syncing = true;
+  queue.queued = false;
+
+  try {
+    console.log(`🔄 Starting sync for user: ${username}`);
+    const filesMeta = await syncDirectoryToMetaBatch(username);
+    await saveFilesMeta(username, filesMeta);
+    console.log(`✓ Sync completed for user: ${username} (${filesMeta.length} files)`);
+  } catch (error) {
+    console.error(`❌ Sync failed for user ${username}:`, error);
+  } finally {
+    queue.syncing = false;
+
+    // If another sync was queued, start it
+    if (queue.queued) {
+      setImmediate(() => queuedSync(username));
+    }
+  }
+}
+
+// Enhanced CORS configuration
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    // Allow all origins in development
+    if (IS_TEST_MODE) return callback(null, true);
+    
+    // In production, you might want to restrict this
+    callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 86400 // 24 hours
+};
+
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Handle preflight requests
+app.options('*', cors(corsOptions));
 
 const sessions = new Map();
 const sessionTimeouts = new Map();
@@ -311,7 +416,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Authentication Routes
-app.post('/api/auth/register', authenticateAPI, (req, res) => {
+app.post('/api/auth/register', authenticateAPI, async (req, res) => {
   try {
     const { username, password } = req.body;
     
@@ -339,7 +444,7 @@ app.post('/api/auth/register', authenticateAPI, (req, res) => {
     };
     
     saveUsers(users);
-    initializeUserProject(username);
+    await initializeUserProject(username);
     
     console.log('✓ User registered:', username);
     
@@ -354,7 +459,7 @@ app.post('/api/auth/register', authenticateAPI, (req, res) => {
   }
 });
 
-app.post('/api/auth/login', authenticateAPI, (req, res) => {
+app.post('/api/auth/login', authenticateAPI, async (req, res) => {
   try {
     const { username, password } = req.body;
     
@@ -371,7 +476,7 @@ app.post('/api/auth/login', authenticateAPI, (req, res) => {
     
     user.lastLogin = new Date().toISOString();
     saveUsers(users);
-    initializeUserProject(username);
+    await initializeUserProject(username);
     
     console.log('✓ User logged in:', username);
     
@@ -386,7 +491,7 @@ app.post('/api/auth/login', authenticateAPI, (req, res) => {
   }
 });
 
-app.post('/api/auth/verify', authenticateAPI, (req, res) => {
+app.post('/api/auth/verify', authenticateAPI, async (req, res) => {
   try {
     const { username } = req.body;
     
@@ -399,7 +504,7 @@ app.post('/api/auth/verify', authenticateAPI, (req, res) => {
       return res.status(401).json({ error: 'User not found' });
     }
     
-    initializeUserProject(username);
+    await initializeUserProject(username);
     
     res.json({ success: true, username, valid: true });
   } catch (error) {
@@ -422,8 +527,8 @@ app.post('/api/projects', authenticateAPI, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    initializeUserProject(username);
-    const project = loadProjectMeta(username);
+    await initializeUserProject(username);
+    const project = await loadProjectMeta(username);
     
     res.json({ success: true, project });
   } catch (error) {
@@ -440,7 +545,7 @@ app.get('/api/projects', authenticateAPI, async (req, res) => {
       return res.status(400).json({ error: 'Username required' });
     }
     
-    const project = loadProjectMeta(username);
+    const project = await loadProjectMeta(username);
     res.json({ projects: [project] });
   } catch (error) {
     console.error('Get projects error:', error);
@@ -450,14 +555,14 @@ app.get('/api/projects', authenticateAPI, async (req, res) => {
 
 app.get('/api/projects/:projectId', authenticateAPI, async (req, res) => {
   try {
-    const { projectId } = req.params; // projectId is username
+    const { projectId } = req.params;
     
     const users = loadUsers();
     if (!users[projectId]) {
       return res.status(404).json({ error: 'User/Project not found' });
     }
     
-    const project = loadProjectMeta(projectId);
+    const project = await loadProjectMeta(projectId);
     res.json({ project });
   } catch (error) {
     console.error('Get project error:', error);
@@ -468,7 +573,7 @@ app.get('/api/projects/:projectId', authenticateAPI, async (req, res) => {
 // Load project from metadata to filesystem
 app.post('/api/projects/:projectId/load', authenticateAPI, async (req, res) => {
   try {
-    const { projectId } = req.params; // projectId is username
+    const { projectId } = req.params;
     
     const users = loadUsers();
     if (!users[projectId]) {
@@ -476,25 +581,25 @@ app.post('/api/projects/:projectId/load', authenticateAPI, async (req, res) => {
     }
 
     const userPath = getUserProjectPath(projectId);
-    if (!fs.existsSync(userPath)) {
-      fs.mkdirSync(userPath, { recursive: true });
+    if (!fsSync.existsSync(userPath)) {
+      await fs.mkdir(userPath, { recursive: true });
     }
 
-    const files = loadFilesMeta(projectId);
+    const files = await loadFilesMeta(projectId);
 
     for (const file of files) {
       const fullPath = path.join(userPath, file.path);
       
       if (file.type === 'folder') {
-        if (!fs.existsSync(fullPath)) {
-          fs.mkdirSync(fullPath, { recursive: true });
+        if (!fsSync.existsSync(fullPath)) {
+          await fs.mkdir(fullPath, { recursive: true });
         }
       } else {
         const dir = path.dirname(fullPath);
-        if (!fs.existsSync(dir)) {
-          fs.mkdirSync(dir, { recursive: true });
+        if (!fsSync.existsSync(dir)) {
+          await fs.mkdir(dir, { recursive: true });
         }
-        fs.writeFileSync(fullPath, file.content || '');
+        await fs.writeFile(fullPath, file.content || '');
       }
     }
 
@@ -535,15 +640,15 @@ app.post('/api/files', authenticateAPI, async (req, res) => {
     const fullPath = path.join(userPath, filePath);
     
     if (type === 'folder') {
-      fs.mkdirSync(fullPath, { recursive: true });
+      await fs.mkdir(fullPath, { recursive: true });
     } else {
-      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-      fs.writeFileSync(fullPath, content || '');
+      await fs.mkdir(path.dirname(fullPath), { recursive: true });
+      await fs.writeFile(fullPath, content || '');
     }
 
-    const files = loadFilesMeta(username);
+    const files = await loadFilesMeta(username);
     files.push(file);
-    saveFilesMeta(username, files);
+    await saveFilesMeta(username, files);
 
     res.json({ success: true, file });
   } catch (error) {
@@ -561,7 +666,7 @@ app.put('/api/files/:fileId', authenticateAPI, async (req, res) => {
       return res.status(400).json({ error: 'Username required' });
     }
 
-    const files = loadFilesMeta(username);
+    const files = await loadFilesMeta(username);
     const fileIndex = files.findIndex(f => f._id === fileId);
     
     if (fileIndex < 0) {
@@ -576,12 +681,12 @@ app.put('/api/files/:fileId', authenticateAPI, async (req, res) => {
     }
 
     const fullPath = path.join(userPath, file.path);
-    fs.writeFileSync(fullPath, content);
+    await fs.writeFile(fullPath, content);
 
     files[fileIndex].content = content;
     files[fileIndex].size = Buffer.byteLength(content, 'utf8');
     files[fileIndex].updatedAt = new Date().toISOString();
-    saveFilesMeta(username, files);
+    await saveFilesMeta(username, files);
 
     res.json({ success: true });
   } catch (error) {
@@ -598,7 +703,7 @@ app.get('/api/files', authenticateAPI, async (req, res) => {
       return res.status(400).json({ error: 'Username required' });
     }
     
-    const files = loadFilesMeta(username);
+    const files = await loadFilesMeta(username);
     res.json({ files });
   } catch (error) {
     console.error('Get files error:', error);
@@ -615,7 +720,7 @@ app.delete('/api/files/:fileId', authenticateAPI, async (req, res) => {
       return res.status(400).json({ error: 'Username required' });
     }
 
-    const files = loadFilesMeta(username);
+    const files = await loadFilesMeta(username);
     const file = files.find(f => f._id === fileId);
     
     if (!file) {
@@ -630,16 +735,16 @@ app.delete('/api/files/:fileId', authenticateAPI, async (req, res) => {
 
     const fullPath = path.join(userPath, file.path);
     
-    if (fs.existsSync(fullPath)) {
+    if (fsSync.existsSync(fullPath)) {
       if (file.type === 'folder') {
-        fs.rmSync(fullPath, { recursive: true, force: true });
+        await fs.rm(fullPath, { recursive: true, force: true });
       } else {
-        fs.unlinkSync(fullPath);
+        await fs.unlink(fullPath);
       }
     }
 
     const updatedFiles = files.filter(f => f._id !== fileId);
-    saveFilesMeta(username, updatedFiles);
+    await saveFilesMeta(username, updatedFiles);
 
     res.json({ success: true });
   } catch (error) {
@@ -648,10 +753,10 @@ app.delete('/api/files/:fileId', authenticateAPI, async (req, res) => {
   }
 });
 
-// Sync endpoint
+// Improved sync endpoint with queue
 app.post('/api/projects/:projectId/sync', authenticateAPI, async (req, res) => {
   try {
-    const { projectId } = req.params; // projectId is username
+    const { projectId } = req.params;
     
     const users = loadUsers();
     if (!users[projectId]) {
@@ -659,17 +764,30 @@ app.post('/api/projects/:projectId/sync', authenticateAPI, async (req, res) => {
     }
 
     const userPath = getUserProjectPath(projectId);
-    if (!fs.existsSync(userPath)) {
+    if (!fsSync.existsSync(userPath)) {
       return res.status(404).json({ error: 'Project directory not found' });
     }
 
-    syncDirectoryToMeta(projectId);
+    // Queue the sync operation (non-blocking)
+    queuedSync(projectId);
 
-    res.json({ success: true, message: 'Project synced to JSON metadata' });
+    res.json({ success: true, message: 'Sync queued', syncing: true });
   } catch (error) {
     console.error('Sync project error:', error);
     res.status(500).json({ error: error.message });
   }
+});
+
+// New endpoint to check sync status
+app.get('/api/projects/:projectId/sync-status', authenticateAPI, (req, res) => {
+  const { projectId } = req.params;
+  const queue = syncQueues.get(projectId);
+  
+  if (!queue) {
+    return res.json({ syncing: false, queued: false });
+  }
+  
+  res.json({ syncing: queue.syncing, queued: queue.queued });
 });
 
 // Git Operations
@@ -781,7 +899,7 @@ app.delete('/api/sessions/:sessionId', authenticateAPI, (req, res) => {
   res.json({ message: 'Session terminated', sessionId: req.params.sessionId });
 });
 
-// WebSocket Terminal Handler
+// WebSocket Terminal Handler with improved sync handling
 wss.on('connection', (ws, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const sessionId = url.searchParams.get('sessionId');
@@ -802,6 +920,8 @@ wss.on('connection', (ws, req) => {
 
   let ptyProcess = null;
   let commandBuffer = '';
+  let lastSyncTime = Date.now();
+  const SYNC_DEBOUNCE_MS = 5000; // Sync at most every 5 seconds
 
   ws.on('message', (message) => {
     try {
@@ -810,8 +930,8 @@ wss.on('connection', (ws, req) => {
       if (data.type === 'start') {
         const sessionDir = getUserProjectPath(session.userId);
         
-        if (!fs.existsSync(sessionDir)) {
-          fs.mkdirSync(sessionDir, { recursive: true });
+        if (!fsSync.existsSync(sessionDir)) {
+          fsSync.mkdirSync(sessionDir, { recursive: true });
         }
 
         const bashrcPath = path.join(sessionDir, '.bashrc');
@@ -836,7 +956,7 @@ cd() {
 builtin cd "$WORKSPACE"
 clear
 `;
-        fs.writeFileSync(bashrcPath, bashrcContent);
+        fsSync.writeFileSync(bashrcPath, bashrcContent);
 
         ptyProcess = pty.spawn('/bin/bash', ['--rcfile', bashrcPath, '-i'], {
           name: 'xterm-color',
@@ -887,6 +1007,15 @@ clear
               commandBuffer = '';
               return;
             }
+            
+            // Debounced sync after command execution
+            const now = Date.now();
+            if (now - lastSyncTime > SYNC_DEBOUNCE_MS) {
+              lastSyncTime = now;
+              // Trigger sync asynchronously without blocking
+              setImmediate(() => queuedSync(session.userId));
+            }
+            
             commandBuffer = '';
           } else if (data.data === '\x7f' || data.data === '\b') {
             commandBuffer = commandBuffer.slice(0, -1);
@@ -903,6 +1032,12 @@ clear
         if (ptyProcess) {
           ptyProcess.resize(data.cols, data.rows);
         }
+      } else if (data.type === 'sync') {
+        // Manual sync trigger from client
+        queuedSync(session.userId);
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'sync-started' }));
+        }
       }
     } catch (error) {
       console.error('WebSocket message error:', error);
@@ -912,10 +1047,10 @@ clear
   ws.on('close', () => {
     console.log(`WebSocket closed: ${sessionId}`);
     
-    // Sync filesystem to metadata before cleanup
+    // Final sync before cleanup
     if (session.userId) {
-      syncDirectoryToMeta(session.userId);
-      console.log(`Synced project for user: ${session.userId}`);
+      console.log(`📝 Final sync for user: ${session.userId}`);
+      queuedSync(session.userId);
     }
     
     cleanup(sessionId);
@@ -965,12 +1100,19 @@ async function shutdown() {
   console.log('\nShutting down...');
   
   // Sync all active sessions
+  const syncPromises = [];
   sessions.forEach((session) => {
     if (session.userId) {
       console.log(`📝 Final sync for user: ${session.userId}`);
-      syncDirectoryToMeta(session.userId);
+      syncPromises.push(queuedSync(session.userId));
     }
   });
+  
+  // Wait for all syncs to complete (with timeout)
+  await Promise.race([
+    Promise.all(syncPromises),
+    new Promise(resolve => setTimeout(resolve, 10000)) // 10s timeout
+  ]);
   
   sessions.forEach((session, sessionId) => {
     cleanup(sessionId);
@@ -982,6 +1124,19 @@ async function shutdown() {
   });
 }
 
+// Periodic sync for active sessions (every 30 seconds)
+setInterval(() => {
+  sessions.forEach((session) => {
+    if (session.status === 'active' && session.userId) {
+      const queue = syncQueues.get(session.userId);
+      // Only sync if not already syncing or queued
+      if (!queue || (!queue.syncing && !queue.queued)) {
+        queuedSync(session.userId);
+      }
+    }
+  });
+}, 30000);
+
 // Start Server
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n╔════════════════════════════════════════════╗`);
@@ -991,7 +1146,7 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`💾 Storage: JSON Files (Multi-User)`);
   console.log(`📦 Mode: ${IS_TEST_MODE ? 'TEST' : 'PRODUCTION'}`);
   console.log(`🔒 Security: Command filtering enabled`);
-  console.log(`🔄 Auto-sync: Enabled on terminal close`);
+  console.log(`🔄 Auto-sync: Debounced + Queued (5s interval)`);
   console.log(`👥 Users: ${Object.keys(loadUsers()).length} registered`);
   console.log(`📂 Workspace: ${WORKSPACE_ROOT}`);
   console.log(`\n✓ Ready\n`);

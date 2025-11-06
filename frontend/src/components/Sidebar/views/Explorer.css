@@ -295,7 +295,9 @@
   opacity: 0.8;
 }
 
-/* Spin Animation for Loading States */
+/* Add these to your existing Explorer.css */
+
+/* Spin animation for loading icons */
 @keyframes spin {
   from {
     transform: rotate(0deg);
@@ -309,24 +311,168 @@
   animation: spin 1s linear infinite;
 }
 
-/* Responsive */
-@media (max-width: 600px) {
-  .modal-content {
-    width: 95%;
-    margin: 0 10px;
+/* Loading state */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: var(--text-secondary);
+  gap: 12px;
+}
+
+.loading-state svg {
+  color: var(--accent-color);
+}
+
+.loading-state p {
+  font-size: 14px;
+  margin: 0;
+}
+
+/* Sync indicator (appears over file tree during sync) */
+.sync-indicator {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--border-color);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--accent-color);
+  z-index: 10;
+}
+
+.sync-indicator svg {
+  flex-shrink: 0;
+}
+
+/* Explorer footer improvements */
+.explorer-footer {
+  border-top: 1px solid var(--border-color);
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-secondary);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.sync-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sync-icon {
+  flex-shrink: 0;
+}
+
+.file-count {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.last-sync {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+/* Icon button states */
+.icon-button {
+  position: relative;
+  transition: all 0.15s ease;
+}
+
+.icon-button.syncing {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.icon-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Secondary button for actions */
+.secondary-button {
+  margin-top: 12px;
+  padding: 8px 16px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.secondary-button:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-color);
+}
+
+/* Pulsing effect for syncing icons */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.icon-button.syncing svg {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Progressive loading indicator */
+.explorer-content {
+  position: relative;
+}
+
+.explorer-content .file-tree {
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.explorer-content.loading .file-tree {
+  opacity: 0.6;
+}
+
+/* File count updates with smooth transition */
+.file-count {
+  transition: color 0.3s ease;
+}
+
+.file-count.updating {
+  color: var(--accent-color);
+  font-weight: 600;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .explorer-footer {
+    font-size: 10px;
+    padding: 6px 8px;
   }
   
-  .modal-header,
-  .modal-body,
-  .modal-footer {
-    padding: 16px;
+  .sync-indicator {
+    font-size: 11px;
+    padding: 6px 8px;
   }
   
-  .modal-footer {
-    flex-direction: column;
-  }
-  
-  .modal-button {
-    width: 100%;
+  .last-sync {
+    display: none;
   }
 }
