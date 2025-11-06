@@ -6,6 +6,7 @@
   border-top: 1px solid var(--border-color);
   position: relative;
   width: 100%;
+  overflow-y: auto;
 }
 
 .terminal-panel-resizer {
@@ -195,12 +196,61 @@
   color: white;
 }
 
-/* Enhanced Content Area */
+/* Enhanced Content Area with Scrolling */
 .terminal-panel-content-enhanced {
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   position: relative;
   background: var(--bg-primary);
+  scroll-behavior: smooth;
+}
+
+/* Custom Scrollbar Styles */
+.terminal-panel-content-enhanced::-webkit-scrollbar,
+.ports-list::-webkit-scrollbar,
+.output-content::-webkit-scrollbar,
+.terminal-tabs::-webkit-scrollbar,
+.terminal-subtabs::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.terminal-panel-content-enhanced::-webkit-scrollbar-track,
+.ports-list::-webkit-scrollbar-track,
+.output-content::-webkit-scrollbar-track,
+.terminal-tabs::-webkit-scrollbar-track,
+.terminal-subtabs::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+.terminal-panel-content-enhanced::-webkit-scrollbar-thumb,
+.ports-list::-webkit-scrollbar-thumb,
+.output-content::-webkit-scrollbar-thumb,
+.terminal-tabs::-webkit-scrollbar-thumb,
+.terminal-subtabs::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 5px;
+  border: 2px solid var(--bg-secondary);
+}
+
+.terminal-panel-content-enhanced::-webkit-scrollbar-thumb:hover,
+.ports-list::-webkit-scrollbar-thumb:hover,
+.output-content::-webkit-scrollbar-thumb:hover,
+.terminal-tabs::-webkit-scrollbar-thumb:hover,
+.terminal-subtabs::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* Terminal Output Container */
+.terminal-output {
+  padding: 12px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 .terminal-empty-state {
@@ -444,6 +494,14 @@
 .output-content {
   flex: 1;
   overflow-y: auto;
+  overflow-x: auto;
+  padding: 12px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 /* Mobile Responsive */
