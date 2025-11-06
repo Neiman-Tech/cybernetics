@@ -1,10 +1,10 @@
 .terminal-instance {
   width: 100%;
   height: 100%;
-  overflow: hidden;
   padding: 8px;
-  overflow-y: auto;
   background: var(--bg-secondary);
+  /* Remove overflow properties - let xterm handle it */
+  position: relative;
 }
 
 .terminal-instance .xterm {
@@ -12,12 +12,39 @@
   width: 100% !important;
 }
 
+/* This is the key - xterm viewport handles scrolling */
 .terminal-instance .xterm-viewport {
-  overflow-y: auto !important;
+  overflow-y: scroll !important;
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-muted) var(--bg-secondary);
+}
+
+/* Custom scrollbar for xterm viewport */
+.terminal-instance .xterm-viewport::-webkit-scrollbar {
+  width: 10px;
+}
+
+.terminal-instance .xterm-viewport::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+.terminal-instance .xterm-viewport::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 5px;
+  border: 2px solid var(--bg-secondary);
+}
+
+.terminal-instance .xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
 }
 
 .terminal-instance .xterm-screen {
-  height: 100% !important;
+  height: auto !important;
+}
+
+/* Ensure xterm rows are properly sized */
+.terminal-instance .xterm-rows {
+  height: auto !important;
 }
 
 /* Mobile adjustments */
@@ -29,6 +56,10 @@
   .terminal-instance .xterm {
     font-size: 12px !important;
   }
+  
+  .terminal-instance .xterm-viewport::-webkit-scrollbar {
+    width: 6px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -38,5 +69,9 @@
   
   .terminal-instance .xterm {
     font-size: 11px !important;
+  }
+  
+  .terminal-instance .xterm-viewport::-webkit-scrollbar {
+    width: 4px;
   }
 }

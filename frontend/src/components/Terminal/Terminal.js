@@ -15,7 +15,6 @@ const draculaTheme = {
   cursor: 'rgba(30, 251, 5, 1)',
   selectionBackground: '#44475a',
   black: '#000000',
-
 };
 
 const solarizedLightTheme = {
@@ -24,7 +23,6 @@ const solarizedLightTheme = {
   cursor: '#0e5ff4ff',
   selectionBackground: '#eee',
   white: '#eee',
-
 };
 
 const replaceHostname = (text) => {
@@ -71,9 +69,11 @@ const Terminal = ({ terminalId, isActive }) => {
         fontSize: 15,
         fontFamily: "'Consolas', 'Monaco', 'Courier New', monospace",
         theme: chosenTheme,
-        scrollback: 1000,
+        scrollback: 10000, // Increased scrollback buffer
         rows: 24,
         cols: 80,
+        allowTransparency: false,
+        convertEol: true, // Convert EOL to CRLF
       });
 
       const fitAddon = new FitAddon();
@@ -109,6 +109,11 @@ const Terminal = ({ terminalId, isActive }) => {
           if (message.type === 'output') {
             const processedData = replaceHostname(message.data);
             xterm.write(processedData);
+            
+            // Auto-scroll to bottom after writing
+            requestAnimationFrame(() => {
+              xterm.scrollToBottom();
+            });
 
             for (let char of message.data) {
               if (char === '\r' || char === '\n') {
@@ -136,8 +141,10 @@ const Terminal = ({ terminalId, isActive }) => {
             }
           } else if (message.type === 'exit') {
             xterm.write('\r\n\x1b[31mProcess exited\x1b[0m\r\n');
+            xterm.scrollToBottom();
             setTimeout(() => refreshFiles(), 500);
           } else if (message.type === 'ready') {
+            xterm.scrollToBottom();
             setTimeout(() => refreshFiles(), 1500);
           }
         } catch (error) {
@@ -208,6 +215,9 @@ const Terminal = ({ terminalId, isActive }) => {
     if (fitAddonRef.current && isActive) {
       setTimeout(() => {
         fitAddonRef.current.fit();
+        if (xtermRef.current) {
+          xtermRef.current.scrollToBottom();
+        }
       }, 100);
     }
   }, [isActive]);
