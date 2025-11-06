@@ -21,6 +21,7 @@ export const useProject = () => {
 };
 
 export const ProjectProvider = ({ children, username }) => {
+  
   const [currentProject, setCurrentProject] = useState(null);
   const [files, setFiles] = useState([]);
   const [openFiles, setOpenFiles] = useState([]);
@@ -30,7 +31,7 @@ export const ProjectProvider = ({ children, username }) => {
   const isSyncingRef = useRef(false);
   const syncQueuedRef = useRef(false);
   const hasInitialized = useRef(false);
-
+  
   // Load user project on mount or when username changes
   useEffect(() => {
     if (!username) {

@@ -1,7 +1,8 @@
+// FIX: Changed terminal-subtab from <button> to <div> to avoid nested buttons warning
+
 import React, { useRef, useCallback, useState, useEffect } from 'react';
 import { useTerminal } from '../../contexts/TerminalContext';
 import Terminal from './Terminal';
-//import { usePortDetection } from '../../utils/portDetection';
 
 import { 
   VscAdd, 
@@ -26,20 +27,14 @@ import { v4 as uuidv4 } from 'uuid';
 import './TerminalPanel.css';
 
 const TerminalPanel = ({ height, onResize, isFullPage, onExitFullPage, onFullPage }) => {
-  //const { ports, forwardPort, stopForwarding, refresh } = usePortDetection();
-  //console.log('Active ports:', ports);
   const { terminals, activeTerminalId, addTerminal, removeTerminal, setActiveTerminalId } = useTerminal();
   const resizerRef = useRef(null);
   const [activeTab, setActiveTab] = useState('terminal');
   const [isTerminalVisible, setIsTerminalVisible] = useState(true);
   const [forwardedPorts, setForwardedPorts] = useState([]);
-  const [showPortsPanel, setShowPortsPanel] = useState(false);
 
-  // Simulated port detection (you'll replace this with actual cloudflared detection)
   useEffect(() => {
     const detectPorts = () => {
-      // This is where you'd integrate with cloudflared
-      // For now, we'll simulate port detection
       const simulatedPorts = [
         { port: 3000, status: 'running', protocol: 'http', address: 'localhost:3000' },
         { port: 5173, status: 'running', protocol: 'http', address: 'localhost:5173' },
@@ -104,8 +99,6 @@ const TerminalPanel = ({ height, onResize, isFullPage, onExitFullPage, onFullPag
   const handleCopyPortUrl = (address) => {
     navigator.clipboard.writeText(`http://${address}`);
   };
-
-  const activeTerminal = terminals.find(t => t.id === activeTerminalId);
 
   const containerStyle = isFullPage 
     ? { height: '100%', maxHeight: '100vh' }
@@ -331,7 +324,7 @@ const TerminalPanel = ({ height, onResize, isFullPage, onExitFullPage, onFullPag
           {activeTab === 'terminal' && terminals.length > 0 && (
             <div className="terminal-subtabs">
               {terminals.map(terminal => (
-                <button
+                <div
                   key={terminal.id}
                   className={`terminal-subtab ${activeTerminalId === terminal.id ? 'active' : ''}`}
                   onClick={() => setActiveTerminalId(terminal.id)}
@@ -344,7 +337,7 @@ const TerminalPanel = ({ height, onResize, isFullPage, onExitFullPage, onFullPag
                   >
                     <VscClose size={12} />
                   </button>
-                </button>
+                </div>
               ))}
             </div>
           )}

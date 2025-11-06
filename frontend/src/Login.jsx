@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 
 // Use environment variables from .env file
@@ -8,7 +9,7 @@ const API_CONFIG = {
 
 console.log('🔧 API Configuration:', {
   API_URL: API_CONFIG.API_URL,
-  API_KEY: '***', // Don't log the actual key
+  API_KEY: '***',
   REACT_APP_API_URL: process.env.REACT_APP_API_URL
 });
 
@@ -27,14 +28,12 @@ export default function Login({ onLoginSuccess }) {
 
   const checkStoredSession = async () => {
     try {
-      // Check if window.storage exists
-      
-
-      const result = localStorage.getItem('ide_username');
-      if (result) {
-        console.log('✓ Found stored session:', result.value);
-        // Skip verification, trust the stored session
-        onLoginSuccess(result.value);
+      // FIX 1: localStorage.getItem returns a string, not an object
+      const storedUsername = localStorage.getItem('ide_username');
+      if (storedUsername) {
+        console.log('✓ Found stored session:', storedUsername);
+        // Pass the string directly, not result.value
+        onLoginSuccess(storedUsername);
       } else {
         console.log('ℹ️ No stored session found');
         setChecking(false);
@@ -87,26 +86,19 @@ export default function Login({ onLoginSuccess }) {
       });
 
       const data = await response.json();
-      const user = localStorage.getItem('ide_username');
+      
       if (response.ok) {
+        // FIX 2: Always save to localStorage after successful authentication
         try {
-            
-          if (!user) {
-            const saveResult = localStorage.setItem('ide_username', username);
-            if (saveResult) {
-              console.log('✓ Session saved to storage successfully');
-            } else {
-              console.warn('⚠️ Storage set returned null');
-            }
-          } else {
-            console.warn('⚠️ window.storage not available, session will not persist');
-          }
+          localStorage.setItem('ide_username', username);
+          console.log('✓ Session saved to localStorage successfully');
         } catch (storageError) {
-          console.error('❌ Storage error:', storageError);
+          console.error('❌ localStorage error:', storageError);
           setError('Warning: Session may not persist after reload');
         }
         
         console.log('✓ Authentication successful:', username);
+        // FIX 3: Pass the username string, not undefined
         onLoginSuccess(username);
       } else {
         setError(data.error || 'Authentication failed');
